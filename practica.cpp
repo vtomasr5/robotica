@@ -45,7 +45,7 @@ double PES_OBSTACLE;
 double PES_SENSORS[NUM_SENSORS];
 double Do; // distancia de marge entre l'objectiu i el robot
 double Dr; // angle limit de rotacio
-double ANGLE_BORDEJAR_PARETS;
+double ANGLE_SEGUIR_PARETS;
 double HEADING;
 double T; // temps d'espera entre moviments
 int TASCA;
@@ -57,7 +57,7 @@ const double NO_OBSTACLES = DBL_MAX; // valor maxim en format double
 // mostra per pantalla si esta en mode DEBUG
 void print(const string& message)
 {
-    if (DEBUG) cout << endl << message << endl << endl;
+    if (DEBUG) cout << endl << message << endl;
 }
 
 // convert string to double
@@ -85,9 +85,11 @@ void print_robot(ArRobot* robot3)
     double y = robot3->getY();
     double th = robot3->getTh();
 
-    cout << "rX = " << x << endl;
-    cout << "rY = " << y << endl;
-    cout << "rTh = " << th << endl << endl;
+    if (DEBUG) {
+        cout << "rX = " << x << endl;
+        cout << "rY = " << y << endl;
+        cout << "rTh = " << th << endl << endl;
+    }
 }
 
 // obte el vector objectiu. Retorna l'angle per assolir aquest vector
@@ -152,6 +154,9 @@ double vector_repulsio(ArRobot* robot3, bool &inminent, int &n_obstacles)
 	return NO_OBSTACLES;
 }
 
+// consisteix en calcular el vector objectiu i de repulsio per saber cap a on s'ha 
+// d'orientar el robot. També té en compte els obstacles del seu voltant i adequa la 
+// seva velocitat a la quanitat d'obstacles. Si veu una colisio inminent s'atura.
 void moure_robot(ArRobot* robot3, VPunts p) 
 {
 	VPunts d;
@@ -167,13 +172,13 @@ void moure_robot(ArRobot* robot3, VPunts p)
 	angle_objectiu = vector_objectiu(robot3, p);
 	angle_repulsio = vector_repulsio(robot3, inminent, n_obstacles);
 
-    cout << "angle_objectiu: " << angle_objectiu << endl << endl;
-    cout << "angle_repulsio: " << angle_repulsio << endl << endl;
+    print("angle_objectiu: " + d2s(angle_objectiu));
+    print("angle_repulsio: " + d2s(angle_repulsio));
 
 	if (inminent) robot3->setVel(0);
 
-    //Hi ha obstacles
-	if (angle_repulsio != NO_OBSTACLES) { // ????????
+    //Hi ha obstacles ja que l'angle de repulsio s'ha calculat i per tant es diferent a NO_OBSTACLES
+	if (angle_repulsio != NO_OBSTACLES) {
 		d.x = 0;
         print("OBSTACLES");
         //Tendrem en compte l'objectiu unicament si no hi ha col·lisio inminent
@@ -200,9 +205,10 @@ void moure_robot(ArRobot* robot3, VPunts p)
 
 	if (angle_anterior < 0)	angle_anterior += 360;
 
-	robot3->setHeading(angle_actual); // ???????
+    // orientam el robot
+	robot3->setHeading(angle_actual); 
 
-	// o be hi ha una col·lisio inminent o be esta massa desorientat respecte a l'objectiu
+	// o be hi ha una col·lisio inminent o be esta massa desorientat respecte a l'objectiu. Esperam que acabi.
 	if ((inminent) || (ArMath::fabs(angle_actual - angle_anterior) >= Dr)) {
 		while(!robot3->isHeadingDone(HEADING));
 	}
@@ -251,42 +257,49 @@ bool mes_aprop_objectiu(ArRobot* robot3, VPunts desti, VPunts posicio_anterior)
 	return false;
 }
 
-void bordejar_parets(ArRobot* robot3, VPunts punt) 
+// fa que el robot segueixi els obstacles parets
+// algorisme tipus BUG
+void seguir_parets(ArRobot* robot3, VPunts punt) 
 {
 	VPunts posicio_anterior;
 	double angle;
 	bool inminent;
-	bool atura_bordejar = true;
+	bool atura_seguir = true;
 	int n_obstacles;
 
 	posicio_anterior.x = robot3->getX();
 	posicio_anterior.y = robot3->getY();
 
+    // si el robot no arribat i hi ha obstacles al seu voltant
 	while (!mes_aprop_objectiu(robot3, punt, posicio_anterior) && (n_obstacles != 0)) {
+        // calcula el vector de repulsio
 		angle = vector_repulsio(robot3, inminent, n_obstacles);
 
+        // si hi ha molts d'obstacles, comença a seguir parets
 		if (n_obstacles >= 1) {
-			atura_bordejar = false;
-			angle += ANGLE_BORDEJAR_PARETS;
-		} else {
-			if (!atura_bordejar) {
-				angle = robot3->getTh() + ANGLE_BORDEJAR_PARETS;
-				atura_bordejar = true;
+			atura_seguir = false;
+			angle += ANGLE_SEGUIR_PARETS;
+		} else {  // sino deixa de seguir les parets
+			if (!atura_seguir) {
+				angle = robot3->getTh() + ANGLE_SEGUIR_PARETS;
+				atura_seguir = true;
 			}
 		}
 
 		robot3->setHeading(angle);
 		while(!robot3->isHeadingDone(HEADING));
 		
+        // assignam la velocitat adecuada per seguir parets
         robot3->setVel(100);
 		ArUtil::sleep(T);
 	}
 }
 
+// envia el robot a un punt determinat envitant els obstacles
 void anar_a_punt(ArRobot* robot3, VPunts punt) 
 {
 	int passes = 0;
-	bool atascat = false;
+	bool encallat = false;
 	VPunts posicio_antiga;
 
 	posicio_antiga.x = 0.0;
@@ -295,22 +308,22 @@ void anar_a_punt(ArRobot* robot3, VPunts punt)
 	while (!ha_arribat(robot3, punt)) {
 		passes++;
 
-		if (passes == 5) { // ???????  21
-			if (!mes_aprop_objectiu(robot3, punt, posicio_antiga)) {
-				atascat = true;
-			}
+		if (passes == 10) { // si ho llevam el robot no fa res i el %cpu se dispara
+		    if (!mes_aprop_objectiu(robot3, punt, posicio_antiga)) {
+			    encallat = true;
+		    }
 
-			posicio_antiga.x = robot3->getX();
-			posicio_antiga.y = robot3->getY();
-			passes = 0;
+		    posicio_antiga.x = robot3->getX();
+		    posicio_antiga.y = robot3->getY();
+		    passes = 0;
 		}
 
-		if (atascat) {
-            print("Atascat -> bordeja parets");
-   			bordejar_parets(robot3, punt);
+		if (encallat) {
+            print("Encallat -> bordeja parets");
+   			seguir_parets(robot3, punt);
 			
-            print("Desatascat -> anar cap a l'objectiu");
-			atascat = false;
+            print("Desencallat -> anar cap a l'objectiu");
+			encallat = false;
 		}
 
         print_robot(robot3);
@@ -324,6 +337,7 @@ void anar_a_punt(ArRobot* robot3, VPunts punt)
 	robot3->setVel(0);
 }
 
+// calcula la distancia entre 2 punts
 double distancia(VPunts p1, VPunts p2) 
 {
 	double x = p1.x - p2.x;
@@ -332,6 +346,7 @@ double distancia(VPunts p1, VPunts p2)
 	return sqrt(pow(x, 2) + pow(y, 2));
 }
 
+// obté el següent punt, de menor distancia, on ha d'anat el robot
 VPunts obtenir_seguent_punt(VPunts pos_actual, bool *visitats, int &num_punt) 
 {
 	double menor_distancia = NO_OBSTACLES;
@@ -393,7 +408,7 @@ void carrega_configuracio()
     T = s2d(reader.Get("parametres", "t_espera", "0"));
     Do = s2d(reader.Get("parametres", "do", "0"));
     Dr = s2d(reader.Get("parametres", "dr", "0"));
-    ANGLE_BORDEJAR_PARETS = s2d(reader.Get("parametres", "angle_bordejar_parets", "0"));
+    ANGLE_SEGUIR_PARETS = s2d(reader.Get("parametres", "angle_seguir_parets", "0"));
     TASCA = reader.GetInteger("parametres", "tasca", 0);
 
     string s = "pes_sensor";
@@ -439,7 +454,7 @@ void carrega_configuracio()
         cout << "temps_espera = " << T << endl;
         cout << "Do = " << Do << endl;
         cout << "Dr = " << Dr << endl;
-        cout << "angle_bordejar_parets = " << ANGLE_BORDEJAR_PARETS << endl;
+        cout << "angle_seguir_parets = " << ANGLE_SEGUIR_PARETS << endl;
         cout << "tasca = " << TASCA << endl;
 
         cout << "\nPesos sensors" << endl;
