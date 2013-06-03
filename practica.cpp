@@ -36,7 +36,7 @@ typedef struct {
 } VPunts;
 
 // valors de configuracio 
-double TH;
+//double TH;
 double DIST_MAX;
 double DIST_MIN;
 double MAX_VEL;
@@ -54,7 +54,7 @@ int NPUNTS;
 
 const double NO_OBSTACLES = DBL_MAX; // valor maxim en format double
 
-// mostra per pantalla si esta en mode DEBUG
+// mostra texte per pantalla si esta en mode DEBUG
 void print(const string& message)
 {
     if (DEBUG) cout << endl << message << endl;
@@ -93,13 +93,13 @@ void print_robot(ArRobot* robot3)
 }
 
 // obte el vector objectiu. Retorna l'angle per assolir aquest vector
-double vector_objectiu(ArRobot* robot3, VPunts v) 
+double vector_objectiu(ArRobot* robot3, VPunts p) 
 {
     // Posicio objectiu - posicio robot
 	VPunts r;
 
-	r.x = v.x - robot3->getX();
-	r.y = v.y - robot3->getY();
+	r.x = p.x - robot3->getX();
+	r.y = p.y - robot3->getY();
 
 	return ArMath::atan2(r.y, r.x); // va a l'objectiu en linia recta
 //	return PES_OBJECTIU * ArMath::atan2(r.y, r.x); // va a l'objectiu fent una corba
@@ -157,9 +157,9 @@ double vector_repulsio(ArRobot* robot3, bool &inminent, int &n_obstacles)
 // consisteix en calcular el vector objectiu i de repulsio per saber cap a on s'ha 
 // d'orientar el robot. També té en compte els obstacles del seu voltant i adequa la 
 // seva velocitat a la quanitat d'obstacles. Si veu una colisio inminent s'atura.
-void moure_robot(ArRobot* robot3, VPunts p) 
+void moure_robot(ArRobot* robot3, VPunts punt) 
 {
-	VPunts d;
+	VPunts p;
 	double angle_actual;
 	double angle_anterior;
 	double angle_repulsio;
@@ -169,7 +169,7 @@ void moure_robot(ArRobot* robot3, VPunts p)
 	double vel;
 
     // calculam els vectors objectiu i repulsio
-	angle_objectiu = vector_objectiu(robot3, p);
+	angle_objectiu = vector_objectiu(robot3, punt);
 	angle_repulsio = vector_repulsio(robot3, inminent, n_obstacles);
 
     print("angle_objectiu: " + d2s(angle_objectiu));
@@ -177,29 +177,27 @@ void moure_robot(ArRobot* robot3, VPunts p)
 
 	if (inminent) robot3->setVel(0);
 
-    //Hi ha obstacles ja que l'angle de repulsio s'ha calculat i per tant es diferent a NO_OBSTACLES
+    // hi ha obstacles ja que l'angle de repulsio s'ha calculat i per tant es diferent a NO_OBSTACLES
 	if (angle_repulsio != NO_OBSTACLES) {
-		d.x = 0;
+		p.x = 0;
         print("OBSTACLES");
-        //Tendrem en compte l'objectiu unicament si no hi ha col·lisio inminent
-		if (!inminent) {
-			d.x = ArMath::cos(angle_objectiu);
-		}
+        // tindrem en compte l'objectiu unicament si no hi ha col·lisio inminent
+		if (!inminent) p.x = ArMath::cos(angle_objectiu);
 
-		d.x = d.x + ArMath::cos(angle_repulsio);
-		d.y = 0;
+		p.x += ArMath::cos(angle_repulsio);
+		p.y = 0;
 
-        //Tendrem en compte l'objectiu unicament si no hi ha col·lisio inminent
-		if (!inminent) {
-			d.y = ArMath::sin(angle_objectiu);
-		}
+        // tindrem en compte l'objectiu unicament si no hi ha col·lisio inminent
+		if (!inminent) p.y = ArMath::sin(angle_objectiu);
 
-		d.y = d.y + ArMath::sin(angle_repulsio);
-		angle_actual = ArMath::atan2(d.y, d.x);
-	} else { //No hi ha obstacles
+    	p.y += ArMath::sin(angle_repulsio);
+		angle_actual = ArMath::atan2(p.y, p.x);
+	} else { // no hi ha obstacles
         print("NO OBSTACLES");
 		angle_actual = angle_objectiu;
 	}
+
+    print("angle_actual = " + d2s(angle_actual));
 
 	angle_anterior = robot3->getTh();
 
@@ -213,19 +211,19 @@ void moure_robot(ArRobot* robot3, VPunts p)
 		while(!robot3->isHeadingDone(HEADING));
 	}
 
-    // adaptam la velocitat en funcio del numero d'obstacles del voltant
+    // adaptam la velocitat en funcio del numero d'obstacles del seu voltant
 	vel = MAX_VEL / (double)(n_obstacles + 1); 
 	robot3->setVel(vel);
 }
 
 // comprova si el robot ha arribat al punt objectiu
-bool ha_arribat(ArRobot* robot3, VPunts v) 
+bool ha_arribat(ArRobot* robot3, VPunts p) 
 {
 	VPunts r;
 
     // calculam la "distancia"
-	r.x = v.x - robot3->getX();
-	r.y = v.y - robot3->getY();
+	r.x = p.x - robot3->getX();
+	r.y = p.y - robot3->getY();
 
     // comprovam que la "distancia" sigui menor que la distancia de marge entre el robot i el punt objectiu
 	if ((ArMath::fabs(r.x) < Do) && (ArMath::fabs(r.y) < Do)) 
@@ -237,8 +235,8 @@ bool ha_arribat(ArRobot* robot3, VPunts v)
 // saber si el robot s'esta apropant a l'objectiu
 bool mes_aprop_objectiu(ArRobot* robot3, VPunts desti, VPunts posicio_anterior) 
 {
-	VPunts vobj_actual; //Vector de punts amb objectiu actual
-	VPunts vobj_antic; //Vectro de punts amb objectiu antic
+	VPunts vobj_actual; // vector de punts amb objectiu actual
+	VPunts vobj_antic; // vectro de punts amb objectiu antic
 	double actual;
 	double antic;
 	
@@ -250,7 +248,7 @@ bool mes_aprop_objectiu(ArRobot* robot3, VPunts desti, VPunts posicio_anterior)
 	antic = ArMath::fabs(vobj_actual.x) + ArMath::fabs(vobj_actual.y);
 	actual = ArMath::fabs(vobj_antic.x) + ArMath::fabs(vobj_antic.y);
     
-    //Si ara estem mes aprop de l'objectiu
+    // si estem mes aprop de l'objectiu
 	if (actual < antic) 
 		return true;
 
@@ -274,18 +272,21 @@ void seguir_parets(ArRobot* robot3, VPunts punt)
 	while (!mes_aprop_objectiu(robot3, punt, posicio_anterior) && (n_obstacles != 0)) {
         // calcula el vector de repulsio
 		angle = vector_repulsio(robot3, inminent, n_obstacles);
+//        print("angle_repulsio = " + d2s(angle));
 
-        // si hi ha molts d'obstacles, comença a seguir parets
-		if (n_obstacles >= 1) {
+        // si hi ha obstacles, comença a seguir parets
+		if (n_obstacles > 0) {
+//            print("AQUI 1");
 			atura_seguir = false;
 			angle += ANGLE_SEGUIR_PARETS;
 		} else {  // sino deixa de seguir les parets
 			if (!atura_seguir) {
+//                print("AQUI 2");
 				angle = robot3->getTh() + ANGLE_SEGUIR_PARETS;
 				atura_seguir = true;
 			}
 		}
-
+        print("angle_parets = " + d2s(angle));
 		robot3->setHeading(angle);
 		while(!robot3->isHeadingDone(HEADING));
 		
@@ -305,13 +306,13 @@ void anar_a_punt(ArRobot* robot3, VPunts punt)
 	posicio_antiga.x = 0.0;
 	posicio_antiga.y = 0.0;
 
+    // mentre el robot no hagi arribata al punt de destí
 	while (!ha_arribat(robot3, punt)) {
 		passes++;
 
 		if (passes == 10) { // si ho llevam el robot no fa res i el %cpu se dispara
-		    if (!mes_aprop_objectiu(robot3, punt, posicio_antiga)) {
+		    if (!mes_aprop_objectiu(robot3, punt, posicio_antiga)) 
 			    encallat = true;
-		    }
 
 		    posicio_antiga.x = robot3->getX();
 		    posicio_antiga.y = robot3->getY();
@@ -398,7 +399,7 @@ void carrega_configuracio()
         exit(1);
     }
     // read all values from config file
-    TH = s2d(reader.Get("parametres", "th", "0"));
+//    TH = s2d(reader.Get("parametres", "th", "0"));
     MAX_VEL = s2d(reader.Get("parametres", "vel", "0"));
     DIST_MIN = s2d(reader.Get("parametres", "dist_min", "0"));
     DIST_MAX = s2d(reader.Get("parametres", "dist_max", "0"));
@@ -445,7 +446,7 @@ void carrega_configuracio()
     if (DEBUG) {
         // print values of config file
         print("Valors del fitxer de configuracio:");
-        cout << "th = " << TH << endl;
+//        cout << "th = " << TH << endl;
         cout << "vel = " << MAX_VEL << endl;
         cout << "dist_min = " << DIST_MIN << endl;
         cout << "dist_max = " << DIST_MAX << endl;
