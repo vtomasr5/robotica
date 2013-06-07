@@ -171,15 +171,15 @@ void moure_robot(ArRobot* robot3, VPunts punt)
 	angle_objectiu = vector_objectiu(robot3, punt);
 	angle_repulsio = vector_repulsio(robot3, inminent, n_obstacles);
 
-    print("angle_objectiu: " + d2s(angle_objectiu));
-    print("angle_repulsio: " + d2s(angle_repulsio));
+//    print("angle_objectiu: " + d2s(angle_objectiu));
+//    print("angle_repulsio: " + d2s(angle_repulsio));
 
 	if (inminent) robot3->setVel(0);
 
     // hi ha obstacles ja que l'angle de repulsio s'ha calculat i per tant es diferent a NO_OBSTACLES
 	if (angle_repulsio != NO_OBSTACLES) {
 		p.x = 0;
-        print("OBSTACLES");
+//        print("OBSTACLES");
         // tindrem en compte l'objectiu unicament si no hi ha col·lisio inminent
 		if (!inminent) p.x = ArMath::cos(angle_objectiu);
 
@@ -194,7 +194,7 @@ void moure_robot(ArRobot* robot3, VPunts punt)
         // calculam l'angle
 		angle_actual = ArMath::atan2(p.y, p.x);
 	} else { // no hi ha obstacles
-        print("NO OBSTACLES");
+//        print("NO OBSTACLES");
 		angle_actual = angle_objectiu;
 	}
 
@@ -272,7 +272,7 @@ void seguir_parets(ArRobot* robot3, VPunts punt)
 		angle = vector_repulsio(robot3, inminent, n_obstacles);
 
         // si hi ha obstacles, comença a seguir parets
-		if (n_obstacles >= 1) {
+		if (n_obstacles > 0) {
 			atura_seguir = false;
 			angle += ANGLE_SEGUIR_PARETS;
 		} else {  // sino deixa de seguir les parets
@@ -282,7 +282,7 @@ void seguir_parets(ArRobot* robot3, VPunts punt)
 			}
 		}
 
-        print("angle_parets = " + d2s(angle));
+//        print("angle_parets = " + d2s(angle));
 		robot3->setHeading(angle);
 		while(!robot3->isHeadingDone(HEADING));
 		
@@ -424,19 +424,17 @@ void carrega_configuracio()
 
     int j;
     s = "p";
-    for (i = 1; i <= NPUNTS; i++) {
+    for (i = 0; i < NPUNTS; i++) {
         stringstream ss;
         ss << i;
         s1 = s + ss.str();
-        PUNTS[0].x = 0;
-        PUNTS[0].y = 0;
-        for (j = 1; j < 3; j++) {
+        for (j = 1; j <= 2; j++) {
             if (j == 1) {
                 s2 = s1 + "x";
-                PUNTS[i].x = s2d(reader.Get("punts", s2, "0"));               
+                PUNTS[i].x = s2d(reader.Get("punts", s2, "2000"));
            } else {           
                 s2 = s1 + "y";
-                PUNTS[i].y = s2d(reader.Get("punts", s2, "0"));
+                PUNTS[i].y = s2d(reader.Get("punts", s2, "2000"));
            }
         }
     }
@@ -462,7 +460,7 @@ void carrega_configuracio()
 
         cout << "\nNumero de punts: " << NPUNTS << endl;
         cout << "Punts definits: " << endl;
-        for (i = 1; i <= NPUNTS; i++) {
+        for (i = 0; i < NPUNTS; i++) {
             cout << "  Punt " << i << endl;
             cout << "    x = " << PUNTS[i].x << endl;
             cout << "    y = " << PUNTS[i].y << endl;
@@ -503,7 +501,7 @@ int main(int argc, char **argv)
             viatjant_comers(&robot3); 
 		} else { // baix nivell (10)
             print("TASCA BAIX NIVELL");
-			anar_a_punt(&robot3, PUNTS[1]); // comença per 1
+			anar_a_punt(&robot3, PUNTS[0]);
 			print("Ha arribat al punt");
 		}
 	}
