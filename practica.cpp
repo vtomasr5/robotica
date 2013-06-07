@@ -406,7 +406,7 @@ void carrega_configuracio()
     Do = s2d(reader.Get("parametres", "do", "0"));
     Dr = s2d(reader.Get("parametres", "dr", "0"));
     ANGLE_SEGUIR_PARETS = s2d(reader.Get("parametres", "angle_seguir_parets", "0"));
-    TASCA = reader.GetInteger("parametres", "tasca", 0);
+    TASCA = reader.GetInteger("parametres", "tasca", 10);
 
     string s = "pes_sensor";
     string s1, s2;
@@ -498,9 +498,11 @@ int main(int argc, char **argv)
 	carrega_configuracio();
 
 	while (robot3.isRunning()) {
-		if (TASCA == 1) { // alt nivell (1)
+		if (TASCA == 20) { // alt nivell (20)
+            print("TASCA ALT NIVELL");
             viatjant_comers(&robot3); 
-		} else { // baix nivell (0)
+		} else { // baix nivell (10)
+            print("TASCA BAIX NIVELL");
 			anar_a_punt(&robot3, PUNTS[1]); // comença per 1
 			print("Ha arribat al punt");
 		}
